@@ -173,11 +173,10 @@ function div_speed_fn(event) {
 		let i = Math.max(Math.min(Math.floor(
 			(event.x - div.speed.offsetLeft)/32
 		), 4), 0);
-		console.log(i)
 
 		div.speed_ball.style.left = i*40 - 12 + "px";
 
-		step_config.delay = (i+1)*100;
+		step_config.delay = (5-i)*100;
 	}
 }
 
