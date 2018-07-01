@@ -7,8 +7,10 @@ const elem = document.createElement.bind(document),
 const div = {
 	arr: getId("arr"),
 	tag: getId("tag"),
+	speed: getId("ctrl").getElementsByTagName("div")[0],
 	wrap: getId("wrap")
 }
+div.speed_ball = div.speed.getElementsByTagName("div")[0];
 
 const img = {
 	ctrl: getId("ctrl").getElementsByTagName("img")
@@ -152,9 +154,9 @@ function arr_start(fn) {
 		ctrl, // Element control.
 		(tag, state) => {
 			if (state) {
-				img.ctrl[0].setAttribute("disabled", 1);
 				img.ctrl[1].setAttribute("disabled", 1);
-				img.ctrl[2].removeAttribute("disabled");
+				img.ctrl[2].setAttribute("disabled", 1);
+				img.ctrl[3].removeAttribute("disabled");
 			}
 		}
 	);
@@ -163,36 +165,90 @@ function arr_start(fn) {
 
 //-- Controls. --//
 
-// Pause.
+// Speed bar.
+let div_speed_drag;
+
+function div_speed_fn(event) {
+	if (div_speed_drag) {
+		let i = Math.max(Math.min(Math.floor(
+			(event.x - div.speed.offsetLeft)/32
+		), 4), 0);
+		console.log(i)
+
+		div.speed_ball.style.left = i*40 - 12 + "px";
+
+		step_config.delay = (i+1)*100;
+	}
+}
+
+div.speed.addEventListener("mousedown", event => {
+	if (!event.button) {
+		div_speed_drag = 1;
+
+		div_speed_fn(event);
+	}
+});
+
+document.addEventListener("mouseup", event => {
+	if (!event.button)
+		div_speed_drag = null;
+});
+
+document.addEventListener("mousemove", div_speed_fn);
+
+// Rewind.
 img.ctrl[0].addEventListener("click", event => {
 	if (event.preventDefault) event.preventDefault();
-	if (img.ctrl[0].getAttribute("disabled") || !step_config.play) return;
+	if (img.ctrl[0].getAttribute("disabled")) return;
 
 	step_config.play = 0;
 
+	sim_list = [];
+
+	for (let i in arr_list) {
+		arr_list[i].style.top = i*100 + "%";
+		tag_list[i].style.top = i*100 + "%";
+		tag_list[i].style.left = "";
+
+		tag_list[i].setAttribute("state", 0);
+	}
+
 	img.ctrl[0].setAttribute("disabled", 1);
-	img.ctrl[1].removeAttribute("disabled");
-	img.ctrl[2].removeAttribute("disabled");
+	img.ctrl[1].setAttribute("disabled", 1);
+	img.ctrl[2].setAttribute("disabled", 1);
+	img.ctrl[3].removeAttribute("disabled");
 });
 
-// Resume.
+// Pause.
 img.ctrl[1].addEventListener("click", event => {
 	if (event.preventDefault) event.preventDefault();
 	if (img.ctrl[1].getAttribute("disabled")) return;
+
+	step_config.play = 0;
+
+	img.ctrl[1].setAttribute("disabled", 1);
+	img.ctrl[2].removeAttribute("disabled");
+	img.ctrl[3].removeAttribute("disabled");
+});
+
+// Resume.
+img.ctrl[2].addEventListener("click", event => {
+	if (event.preventDefault) event.preventDefault();
+	if (img.ctrl[2].getAttribute("disabled")) return;
 
 	step_config.play = 1;
 
 	step_config.resume();
 
-	img.ctrl[0].removeAttribute("disabled");
-	img.ctrl[1].setAttribute("disabled", 1);
+	img.ctrl[1].removeAttribute("disabled");
 	img.ctrl[2].setAttribute("disabled", 1);
+	img.ctrl[3].setAttribute("disabled", 1);
 });
 
 // Play.
-img.ctrl[2].addEventListener("click", event => {
+img.ctrl[3].addEventListener("click", event => {
 	if (event.preventDefault) event.preventDefault();
-	if (img.ctrl[2].getAttribute("disabled")) return;
+	if (img.ctrl[3].getAttribute("disabled")) return;
 
 	for (let i in arr_list)
 		arr_list[i].style.top = i*100 + "%";
@@ -201,24 +257,25 @@ img.ctrl[2].addEventListener("click", event => {
 	arr_start(fn_sort_insertion);
 
 	img.ctrl[0].removeAttribute("disabled");
-	img.ctrl[1].setAttribute("disabled", 1);
+	img.ctrl[1].removeAttribute("disabled");
 	img.ctrl[2].setAttribute("disabled", 1);
+	img.ctrl[3].setAttribute("disabled", 1);
 });
 
 // Align.
-img.ctrl[3].addEventListener("click", event => {
+img.ctrl[4].addEventListener("click", event => {
 	if (event.preventDefault) event.preventDefault();
-	if (img.ctrl[3].getAttribute("disabled")) return;
+	if (img.ctrl[4].getAttribute("disabled")) return;
 
 	sim_list_swp = !sim_list_swp;
 
 	if (sim_list_swp) {
-		img.ctrl[3].setAttribute("src", "assets/img/default.png");
+		img.ctrl[4].setAttribute("src", "assets/img/default.png");
 
 		for (let i in sim_list)
 			arr_list[sim_list[i]].style.top = i*100 + "%";
 	} else {
-		img.ctrl[3].setAttribute("src", "assets/img/align.png");
+		img.ctrl[4].setAttribute("src", "assets/img/align.png");
 
 		for (let i in arr_list)
 			arr_list[i].style.top = i*100 + "%";

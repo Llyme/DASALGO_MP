@@ -106,15 +106,15 @@ function sort_tag_insertion(arr, tag, format, len) {
  * application.
 --*/
 
-let step_delay = 300;
 // This will contain the controls for stopping or resuming the application.
 let step_config = {
+	delay: 300,
 	play: 1, // 0 = Stop; 1 = Playing
 	resume: () => {} // Placeholder. This will be replaced constantly.
 };
 
 function step(fn) {
-	setTimeout(fn, step_delay);
+	setTimeout(fn, step_config.delay);
 }
 
 /**

@@ -124,3 +124,38 @@ body {
 	transform: scale(0.9, 0.9);
 	transition: all 0.1s;
 }
+
+#ctrl > div {
+	width: 160px;
+	height: 8px;
+	margin: 16px;
+	margin-top: 36px;
+	margin-left: 8px;
+	margin-right: 16px;
+	background-color: #fff;
+	border-radius: 4px;
+	float: right;
+}
+
+#ctrl > div > div {
+	position: relative;
+	display: inline-block;
+	top: -8px;
+	left: 68px;
+	width: 24px;
+	height: 24px;
+	border-radius: 16px;
+	background-color: #1f5ebf;
+	transition: all 0.2s;
+}
+
+#ctrl > div:hover > div, #ctrl > div > div:hover {
+	transform: scale(1.2, 1.2);
+	background-color: #3f7fff;
+}
+
+#ctrl > div:active > div, #ctrl > div > div:active {
+	transform: scale(0.8, 0.8);
+	background-color: #3f7fff;
+	transition: all 0.1s;
+}
