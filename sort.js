@@ -1,13 +1,14 @@
 /**
  * Insert the value in the ordered array via binary search. Also works
- * if empty. If a similar value exists, it will be added to the left-most.
+ * if empty. If a similar value exists, it will be added to the
+ * left-most.
  * @param Object arr - The array. Should be an ordered list, otherwise
  * unintended things might happen.
- * @param Value v - The value to be added. Can be anything, so long as it
- * can be used with the measurement operators.
+ * @param Value v - The value to be added. Can be anything, so long as
+ * it can be used with the measurement operators.
  * @param Function(Object element) format - If the array is filled
- * with Objects, you can use this to manually direct which value will be
- * used. The given paramater is the object inside the array and the
+ * with Objects, you can use this to manually direct which value will
+ * be used. The given paramater is the object inside the array and the
  * function needs to return the value to be assessed.
  * @param Integer len - If supplied, searching will be limited to this
  * length or the array's length, whichever fits properly.
@@ -21,12 +22,12 @@ function insert_binary(arr, v, format, len) {
 
 	format = format ? format : v => v;
 
-	// See if we don't really need to search at all to avoid wasting time.
-	if (format(arr[0]) >= v || !len) {
+	// See if we don't really need to search to avoid wasting time.
+	if (!len || format(arr[0]) >= format(v)) {
 		arr.splice(0, 0, v);
 
 		return 0; // Empty or lowest.
-	} else if (format(arr[arr.length-1]) <= v)
+	} else if (format(arr[arr.length-1]) <= format(v))
 		return arr.push(v); // Highest.
 
 	let l = 0, // Low. This is where the search should start at.
@@ -39,8 +40,8 @@ function insert_binary(arr, v, format, len) {
 		// Grab the shorter half. This is the right side.
 		h = Math.floor(h/2);
 
-		// See if the middle element (If 2 middle elements, the left one).
-		if (format(arr[l+h]) < v)
+		// See if the middle element (If 2 middle elements, left one).
+		if (format(arr[l+h]) < format(v))
 			l += i; // Left one is smaller, go to the right side.
 	}
 
@@ -106,9 +107,9 @@ function sort_tag_insertion(arr, tag, format, len) {
  * application.
 --*/
 
-// This will contain the controls for stopping or resuming the application.
+// Contains the controls for stopping or resuming the application.
 let step_config = {
-	delay: 300,
+	delay: 2,
 	play: 1, // 0 = Stop; 1 = Playing
 	resume: () => {} // Placeholder. This will be replaced constantly.
 };
@@ -118,8 +119,8 @@ function step(fn) {
 }
 
 /**
- * Insertion sort but ran by steps. The array itself will not be modified.
- * 'callback' will be called when done or paused.
+ * Insertion sort but ran by steps. The array itself will not be
+ * modified. 'callback' will be called when done or paused.
 **/
 function fn_sort_insertion(arr, format, len, ctrl, callback) {
 	// Init.

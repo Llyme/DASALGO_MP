@@ -1,4 +1,12 @@
-const {app, BrowserWindow} = require("electron");
+const fs = require("fs");
+const {app, BrowserWindow, ipcMain} = require("electron");
+const csv = a => a.split(/\r\n|\n/).map(v => v.split(","));
+
+let l = csv(fs.readFileSync("assets/map/Map.csv").toString());
+
+ipcMain.on("map", res => {
+	res.returnValue = l;
+});
 
 function init() {
 	let win = new BrowserWindow({
