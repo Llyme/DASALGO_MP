@@ -321,6 +321,184 @@ function reset() {
 	}
 }
 
+/**
+ * Load the data in string format.
+ * @param String str - the data (supposedly coming from a .csv file).
+**/
+function load(str) {
+	// Make sure it's not playing.
+	if (stepper.playing != -1) return;
+
+	// Make a map out of the file's contents (assets/js/map.js).
+	array = map(str);
+
+	// Reset stepper.
+	reset();
+
+	// Reset controls.
+	ctrl_set(0, 0, 0, 0, 1, 1);
+
+	// Clear message list.
+	e.msg_sel_tbody.innerHTML = "<tr head>" +
+		"<td>Location</td>" +
+		"<td>Destination</td>" +
+		"<td>Distance</td>" +
+		"</tr>";
+
+	// Clear workspace.
+	e.space.innerHTML = "";
+
+	// Reset the mailman.
+	e.mailman.setAttribute("hidden", 1);
+	e.space.appendChild(e.mailman);
+
+	// Reset user selections.
+	address_selected = [];
+	office_selected = null;
+
+	// Iterate through the locations.
+	for (let x in array) {
+		// Create the circles on the map.
+		let pnt = q("!div");
+		let tooltip = "<label center>" + x + "</label>" + (
+			array[x].from ?
+			"<br><br><label center>" +
+			array[x].from +
+			"</label>" :
+			""
+		);
+		array[x].pnt = pnt;
+		// Plot it on the screen based on it's position.
+		pnt.style.left = array[x].position[0]*100 + "px";
+		pnt.style.top = array[x].position[1]*100 + "px";
+
+		e.space.appendChild(pnt);
+
+		// If it actually came from something (from Post Office).
+		if (array[x].from) {
+			// Draw a line from post office to this location.
+			let path = q("!path");
+			array[x].path = path;
+			// Nasty maths. Not for the faint of heart.
+			let dir = new lemon.Vector([
+				array[array[x].from].position[0] -
+				array[x].position[0],
+				array[array[x].from].position[1] -
+				array[x].position[1]
+			]);
+			path.style.left = array[x].position[0]*100 + "px";
+			path.style.top = array[x].position[1]*100 + "px";
+			path.style.width = dir.magnitude()*100 + "px";
+			path.style.transform = "rotate(" + Math.atan2(
+				dir[1], dir[0]
+			)/Math.PI*180 + "deg)";
+
+			/* Make these guys hidden (Except post offices).
+			   We'll make it visible if there's a message to be
+			   sent to that location.
+			*/
+			pnt.setAttribute("hidden", 1);
+			path.setAttribute("hidden", 1);
+			e.space.appendChild(path);
+
+			/* This will be used as a way to show where the address
+			   is visually.
+			*/
+			array[x].hover = v => {
+				tooltip_new(v, tooltip);
+
+				v.addEventListener("mouseenter", _ => {
+					path.style.boxShadow = "0 0 0 4px #fff";
+
+					pnt.setAttribute("hover", 1);
+				});
+
+				v.addEventListener("mouseleave", _ => {
+					path.style.boxShadow = "";
+
+					pnt.removeAttribute("hover");
+				});
+			};
+
+			array[x].hover(pnt);
+
+			/* Create an entry of the address so that the user
+			   knows that you can send a mail to this location.
+			*/
+			let tr = q("!tr");
+			array[x].tr = tr;
+
+			/* Append [Post Office, Destination, Distance], in that
+			   order.
+			*/
+			let index = [array[x].from, x, array[x].magnitude];
+
+			for (let i in index) {
+				let td = q("!td");
+				td.innerHTML = index[i];
+
+				tr.appendChild(td);
+			}
+
+			// Toggle location visibility when clicked.
+			tr.addEventListener("click", _ => {
+				// Prompt user for recipient's name.
+				address_target = array[x];
+
+				msg_write_show();
+			});
+
+			e.msg_sel_tbody.appendChild(tr);
+		} else {
+			/* It doesn't have a post office to go from. This is
+			   a post office!
+			*/
+			tooltip_new(pnt, tooltip); // Hook tooltip listener.
+
+			pnt.setAttribute("post", 1); // Mark as post office.
+
+			/* Make it so that you can select which post office
+			   will the mailman start from. By default, none are
+			   selected, which the user can't start without
+			   selecting.
+			*/
+			pnt.addEventListener("click", _ => {
+				// Only let the user select when not playing.
+				if (!stepper.playlist.length) {
+					// Deselect previously selected post office.
+					(office_selected ?
+					array[office_selected]
+						.pnt.removeAttribute("selected")
+					: 0);
+
+					office_selected = x;
+					pnt.setAttribute("selected", 1);
+
+					// Move the mailman to that location.
+					mailman_move(array[office_selected].position);
+
+					// Allow the user to play!
+					ctrl_set(1);
+				}
+			});
+		}
+
+		// Hide the 'drop a file' message.
+		e.dropdown.setAttribute("hidden", 1);
+		// Show the 'select addresses to send to' window.
+		e.msg_sel.removeAttribute("hidden");
+	}
+}
+
+/**
+ * Disabled load-via-pasting since it also affects other text-related
+ * stuff. It works, though.
+
+document.addEventListener("paste", event => load(
+	event.clipboardData.getData("Text")
+));
+**/
+
 // File dropped on the screen.
 document.addEventListener("drop", event => {
 	/* Stop the browser from doing its automatic things. Tell it that
@@ -329,185 +507,22 @@ document.addEventListener("drop", event => {
 	event.stopPropagation();
 	event.preventDefault();
 
-	// Make sure it's not playing.
-	if (stepper.playing != -1) return;
+	let file = event.dataTransfer.items[0];
 
-	/* Just in case if the user drops more than 1 files, just take
-	   the first one.
-	*/
-	let file = event.dataTransfer.files[0];
+	if (file) if (file.type == "application/vnd.ms-excel") {
+		/* Just in case if the user drops more than 1 files, just
+		   take the first one.
+		*/
+		file.getAsFile(file => {
+			// Summon the file reader!
+			let reader = new FileReader();
+			reader.onload = event => load(event.target.result);
 
-	// It needs to have a 'csv' at the end of it's file name.
-	if (file.name.slice(-3) != "csv") return;
-
-	// Summon the file reader!
-	let reader = new FileReader();
-
-	// Run callback as soon as the reader is done doing it's thing.
-	reader.onload = event => {
-		// Make a map out of the file's contents (assets/js/map.js).
-		array = map(event.target.result);
-
-		// Reset stepper.
-		reset();
-
-		// Reset controls.
-		ctrl_set(0, 0, 0, 0, 1, 1);
-
-		// Clear message list.
-		e.msg_sel_tbody.innerHTML = "<tr head>" +
-			"<td>Location</td>" +
-			"<td>Destination</td>" +
-			"<td>Distance</td>" +
-			"</tr>";
-
-		// Clear workspace.
-		e.space.innerHTML = "";
-
-		// Reset the mailman.
-		e.mailman.setAttribute("hidden", 1);
-		e.space.appendChild(e.mailman);
-
-		// Reset user selections.
-		address_selected = [];
-		office_selected = null;
-
-		// Iterate through the locations.
-		for (let x in array) {
-			// Create the circles on the map.
-			let pnt = q("!div");
-			let tooltip = "<label center>" + x + "</label>" + (
-				array[x].from ?
-				"<br><br><label center>" +
-				array[x].from +
-				"</label>" :
-				""
-			);
-			array[x].pnt = pnt;
-			// Plot it on the screen based on it's position.
-			pnt.style.left = array[x].position[0]*100 + "px";
-			pnt.style.top = array[x].position[1]*100 + "px";
-
-			e.space.appendChild(pnt);
-
-			// If it actually came from something (from Post Office).
-			if (array[x].from) {
-				// Draw a line from post office to this location.
-				let path = q("!path");
-				array[x].path = path;
-				// Nasty maths. Not for the faint of heart.
-				let dir = new lemon.Vector([
-					array[array[x].from].position[0] -
-					array[x].position[0],
-					array[array[x].from].position[1] -
-					array[x].position[1]
-				]);
-				path.style.left = array[x].position[0]*100 + "px";
-				path.style.top = array[x].position[1]*100 + "px";
-				path.style.width = dir.magnitude()*100 + "px";
-				path.style.transform = "rotate(" + Math.atan2(
-					dir[1], dir[0]
-				)/Math.PI*180 + "deg)";
-
-				/* Make these guys hidden (Except post offices).
-				   We'll make it visible if there's a message to be
-				   sent to that location.
-				*/
-				pnt.setAttribute("hidden", 1);
-				path.setAttribute("hidden", 1);
-				e.space.appendChild(path);
-
-				/* This will be used as a way to show where the address
-				   is visually.
-				*/
-				array[x].hover = v => {
-					tooltip_new(v, tooltip);
-
-					v.addEventListener("mouseenter", _ => {
-						path.style.boxShadow = "0 0 0 4px #fff";
-
-						pnt.setAttribute("hover", 1);
-					});
-
-					v.addEventListener("mouseleave", _ => {
-						path.style.boxShadow = "";
-
-						pnt.removeAttribute("hover");
-					});
-				};
-
-				array[x].hover(pnt);
-
-				/* Create an entry of the address so that the user
-				   knows that you can send a mail to this location.
-				*/
-				let tr = q("!tr");
-				array[x].tr = tr;
-
-				/* Append [Post Office, Destination, Distance], in that
-				   order.
-				*/
-				let index = [array[x].from, x, array[x].magnitude];
-
-				for (let i in index) {
-					let td = q("!td");
-					td.innerHTML = index[i];
-
-					tr.appendChild(td);
-				}
-
-				// Toggle location visibility when clicked.
-				tr.addEventListener("click", _ => {
-					// Prompt user for recipient's name.
-					address_target = array[x];
-
-					msg_write_show();
-				});
-
-				e.msg_sel_tbody.appendChild(tr);
-			} else {
-				/* It doesn't have a post office to go from. This is
-				   a post office!
-				*/
-				tooltip_new(pnt, tooltip); // Hook tooltip listener.
-
-				pnt.setAttribute("post", 1); // Mark as post office.
-
-				/* Make it so that you can select which post office
-				   will the mailman start from. By default, none are
-				   selected, which the user can't start without
-				   selecting.
-				*/
-				pnt.addEventListener("click", _ => {
-					// Only let the user select when not playing.
-					if (!stepper.playlist.length) {
-						// Deselect previously selected post office.
-						(office_selected ?
-						array[office_selected]
-							.pnt.removeAttribute("selected")
-						: 0);
-
-						office_selected = x;
-						pnt.setAttribute("selected", 1);
-
-						// Move the mailman to that location.
-						mailman_move(array[office_selected].position);
-
-						// Allow the user to play!
-						ctrl_set(1);
-					}
-				});
-			}
-
-			// Hide the 'drop a file' message.
-			e.dropdown.setAttribute("hidden", 1);
-			// Show the 'select addresses to send to' window.
-			e.msg_sel.removeAttribute("hidden");
-		}
-	};
-
-	// Start reading the file synchronously.
-	reader.readAsText(file);
+			// Start reading the file synchronously.
+			reader.readAsText(file);
+		});
+	} else if (file.type == "text/plain")
+		file.getAsString(load);
 });
 
 // Explicitly change the file dragging behavior.
