@@ -332,6 +332,9 @@ function load(str) {
 	// Make a map out of the file's contents (assets/js/map.js).
 	array = map(str);
 
+	// It's a dud. Don't even bother.
+	if (!Object.keys(array).length) return;
+
 	// Reset stepper.
 	reset();
 
@@ -488,16 +491,15 @@ function load(str) {
 		// Show the 'select addresses to send to' window.
 		e.msg_sel.removeAttribute("hidden");
 	}
+
+	return 1;
 }
 
-/**
- * Disabled load-via-pasting since it also affects other text-related
- * stuff. It works, though.
-
-document.addEventListener("paste", event => load(
-	event.clipboardData.getData("Text")
-));
-**/
+// One-time load-via-paste method.
+document.addEventListener("paste", function(event) {
+	if (load(event.clipboardData.getData("Text")))
+		document.removeEventListener("paste", arguments.callee);
+});
 
 // File dropped on the screen.
 document.addEventListener("drop", event => {
@@ -510,17 +512,11 @@ document.addEventListener("drop", event => {
 	let file = event.dataTransfer.items[0];
 
 	if (file) if (file.type == "application/vnd.ms-excel") {
-		/* Just in case if the user drops more than 1 files, just
-		   take the first one.
-		*/
-		file.getAsFile(file => {
-			// Summon the file reader!
-			let reader = new FileReader();
-			reader.onload = event => load(event.target.result);
+		let reader = new FileReader();
+		reader.onload = event => load(event.target.result);
 
-			// Start reading the file synchronously.
-			reader.readAsText(file);
-		});
+		// Read the file.
+		reader.readAsText(event.dataTransfer.files[0]);
 	} else if (file.type == "text/plain")
 		file.getAsString(load);
 });
