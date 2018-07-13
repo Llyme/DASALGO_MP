@@ -30,6 +30,8 @@ let stepper = {
  * Used to manipulate the GUI.
 **/
 stepper.ctrl = (i, flag, v) => {
+	if (!address_selected[i]) return;
+
 	let elm = address_selected[i].div;
 
 	switch(flag) {
