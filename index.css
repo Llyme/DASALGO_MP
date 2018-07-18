@@ -124,7 +124,6 @@ div#tooltip label {
 	line-height: 32px;
 	margin: 16px;
 	float: right;
-	overflow-y: hidden;
 	pointer-events: auto;
 }
 

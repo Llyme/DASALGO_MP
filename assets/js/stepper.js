@@ -341,7 +341,7 @@ stepper.play = (callback, tick) => {
 		];
 	}
 
-	if (!tick)
+	if (tick == null)
 		tick = stepper.playing = Date.now();
 
 	let i = stepper.playlist.length - 1;
