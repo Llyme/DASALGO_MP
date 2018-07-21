@@ -58,10 +58,12 @@ const img = {
 
 // The array of addresses that can be found in the loaded .csv file.
 let array;
-// This array will be the one to be sorted, preserving the true array.
+/* This array will be the one to be sorted, preserving the true array
+   throughout the simulation.
+*/
 let array_tag;
-// Used by the sorter. Do not touch.
-let array_dump = {};
+// Priority list for post office. Newest is the last prioritized.
+let array_prio = [];
 /* All the addresses selected in the message selection will be here.
    Each entry is a combination of the div element, the address
    location, and the date & time it was created.
@@ -77,7 +79,7 @@ let drag;
 let drag_pos = [0, 0];
 // This will indicate the screen's zoom factor.
 let space_scale = 10; // range of 4 to 20.
-// This will indicate which post office will the mailman start from.
+// This will indicate which post office is the mailman in.
 let office_selected;
 // The mailman's position in Vector[2].
 let mailman_pos = new lemon.Vector([0, 0]);
@@ -117,14 +119,12 @@ let div_speed_drag;
  * Set the buttons' state. Setting to null will not change it.
  * 0 = Disabled; 1 = Enabled; null = No Changes
  * @param Integer a - Play button.
- * @param Integer b - Resume button.
- * @param Integer c - Pause button.
- * @param Integer d - Rewind button.
- * @param Integer e - Array button. Mail-writing window.
- * @param Integer f - Sort button.
+ * @param Integer b - Pause button.
+ * @param Integer c - Array button. Mail-writing window.
+ * @param Integer d - Sort button.
 **/
-function ctrl_set(a, b, c, d, e, f) {
-	let l = [a, b, c, d, e, f];
+function ctrl_set(a, b, c, d) {
+	let l = [a, b, c, d];
 
 	for (let i in l)
 		if (l[i] != null)
@@ -188,50 +188,30 @@ document.addEventListener("mouseup", event => {
 // Update whenever the user attempts to move the mouse.
 document.addEventListener("mousemove", div_speed_fn);
 
-function play_callback(i) {
-	if (i == 1)
-		ctrl_set(1, 0, 0, 1, 1);
-}
-
 // Play Button.
 img.ctrl[0].addEventListener("click", _ => {
-	reset();
-	stepper.play(play_callback);
+	stepper.play(i => i == 1 && ctrl_set(1, 0, 1, 1));
 
-	ctrl_set(0, 0, 1, 1, 0, 0);
-});
-
-// Resume Button.
-img.ctrl[1].addEventListener("click", _ => {
-	stepper.play(play_callback);
-
-	ctrl_set(0, 0, 1, null, 0);
+	ctrl_set(0, 1, 0, 0);
 });
 
 // Pause Button.
-img.ctrl[2].addEventListener("click", _ => {
+img.ctrl[1].addEventListener("click", _ => {
 	stepper.playing = -1;
 
-	ctrl_set(1, 1, 0, null, 1);
-});
-
-// Rewind Button.
-img.ctrl[3].addEventListener("click", _ => {
-	reset();
-
-	ctrl_set(1, 0, 0, 0, 1, 1);
+	ctrl_set(1, 0);
 });
 
 // Array Button. Opens the mail creation window.
-img.ctrl[4].addEventListener("click", _ => {
+img.ctrl[2].addEventListener("click", _ => {
 	e.msg_sel.removeAttribute("hidden");
 });
 
 // Sort Button. Change sorting priority.
-img.ctrl[5].addEventListener("click", _ => {
+img.ctrl[3].addEventListener("click", _ => {
 	stepper.sorttime = !stepper.sorttime;
 
-	img.ctrl[5].src = stepper.sorttime ?
+	img.ctrl[3].src = stepper.sorttime ?
 		"assets/img/sorttime.png" : "assets/img/sortdist.png";
 });
 
@@ -267,11 +247,18 @@ e.msg_write_input.addEventListener("keydown", event => {
 		// Make it so that it emphasizes the address on hover.
 		address.hover(div);
 
-		address_selected.push({
+		let i = address_selected.push({
 			div: div,
 			time: t.getTime(), // Convert to seconds.
 			address: address
-		});
+		}) - 1;
+
+		let n = array_tag.unsorted.push(i) - 1 +
+			array_tag.sorted.length;
+
+		stepper.ctrl(i, 0, 1);
+		stepper.ctrl(i, 1, n);
+		stepper.ctrl(i, 2, e.msg_main);
 
 		// Show the point and line towards post office.
 		address.pnt.removeAttribute("hidden");
@@ -282,6 +269,9 @@ e.msg_write_input.addEventListener("keydown", event => {
 
 		// Hide this window.
 		e.msg_write.setAttribute("hidden", 1);
+
+		// Enable play button.
+		ctrl_set(1);
 	}
 });
 
@@ -294,12 +284,12 @@ e.msg_write_close.addEventListener("click", _ =>
 //-- Load Section. Setup portion for the file-loading functions. --//
 
 /**
- * Resets the arrays to when it hasn't played yet.
+ * CLears out the message list and array tag.
 **/
 function reset() {
+	// Message list.
 	e.msg.innerHTML = "";
-	// Draw the message list.
-	e.msg_main.innerHTML = "<div>Unsorted</div>";
+	e.msg_main.innerHTML = "<div></div>";
 
 	e.msg.appendChild(e.msg_main);
 
@@ -307,18 +297,21 @@ function reset() {
 	stepper.key = null;
 	stepper.playlist = [];
 
-	// Clear our the dump.
-	array_dump = [];
-
 	// Clear out the tag list.
-	array_tag = [];
+	array_tag = {
+		dump: {},
+		buffer: {},
+		order: [],
+		unsorted: [],
+		sorted: [],
+		div: {}
+	};
 
-	for (let i in address_selected) {
-		e.msg_main.appendChild(address_selected[i].div);
-		stepper.ctrl(i, 0, 0);
-		stepper.ctrl(i, 1, Number(i));
-		array_tag.push(i);
-	}
+	// Disable play since there's no messages.
+	ctrl_set(0, 0, 1, 1);
+
+	// Disable confirm button for mail creation window.
+	e.msg_sel_btn[0].setAttribute("disabled", 1);
 }
 
 /**
@@ -339,7 +332,7 @@ function load(str) {
 	reset();
 
 	// Reset controls.
-	ctrl_set(0, 0, 0, 0, 1, 1);
+	ctrl_set(0, 0, 0, 1);
 
 	// Clear message list.
 	e.msg_sel_tbody.innerHTML = "<tr head>" +
@@ -357,7 +350,6 @@ function load(str) {
 
 	// Reset user selections.
 	address_selected = [];
-	office_selected = null;
 
 	// Iterate through the locations.
 	for (let x in array) {
@@ -458,42 +450,35 @@ function load(str) {
 			*/
 			tooltip_new(pnt, tooltip); // Hook tooltip listener.
 
-			pnt.setAttribute("post", 1); // Mark as post office.
-
-			/* Make it so that you can select which post office
-			   will the mailman start from. By default, none are
-			   selected, which the user can't start without
-			   selecting.
-			*/
-			pnt.addEventListener("click", _ => {
-				// Only let the user select when not playing.
-				if (!stepper.playlist.length) {
-					// Deselect previously selected post office.
-					(office_selected ?
-					array[office_selected]
-						.pnt.removeAttribute("selected")
-					: 0);
-
-					office_selected = x;
-					pnt.setAttribute("selected", 1);
-
-					// Move the mailman to that location.
-					mailman_move(array[office_selected].position);
-
-					// Allow the user to play!
-					ctrl_set(1);
-				}
-			});
+			pnt.setAttribute("post", x); // Mark as post office.
 		}
 
 		// Hide the 'drop a file' message.
 		e.dropdown.setAttribute("hidden", 1);
 		// Show the 'select addresses to send to' window.
-		e.msg_sel.removeAttribute("hidden");
+		//e.msg_sel.removeAttribute("hidden");
 	}
 
 	return 1;
 }
+
+// Post office selection.
+document.addEventListener("click", event => {
+	if (!event.target) return;
+
+	let x = event.target.getAttribute("post");
+
+	if (event.target && x && !office_selected) {
+		office_selected = x;
+
+		array_tag.order.push(office_selected);
+		event.target.setAttribute("selected", 1);
+		mailman_move(array[x].position);
+
+		// Allow the user to create mails.
+		ctrl_set(0, 0, 1);
+	}
+});
 
 // One-time load-via-paste method.
 document.addEventListener("paste", function(event) {
@@ -537,29 +522,10 @@ document.addEventListener("dragover", event => {
 e.msg_sel_btn[0].addEventListener("click", _ => {
 	// Hide the 'messages' window.
 	e.msg_sel.setAttribute("hidden", 1);
-
-	// Reset everything to a fresh start.
-	reset();
-
-	// Reset controls.
-	ctrl_set(0, 0, 0, 0, 1);
 });
 
 // Reset Button. Clear all selected addresses.
-e.msg_sel_btn[1].addEventListener("click", _ => {
-	// Iterate through all the selected addresses.
-	for (let i in address_selected) {
-		// Hide 'em.
-		address_selected[i].address.pnt.setAttribute("hidden", 1);
-		address_selected[i].address.path.setAttribute("hidden", 1);
-	}
-
-	// Fresh new array.
-	address_selected = [];
-
-	// Don't let the user continue without selecting anything.
-	e.msg_sel_btn[0].setAttribute("disabled", 1);
-});
+e.msg_sel_btn[1].addEventListener("click", reset);
 
 
 //-- Screen Behaviour Section. Make the mouse responsive. --//

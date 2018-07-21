@@ -53,50 +53,71 @@ stepper.ctrl = (i, flag, v) => {
  * This separates all by post offices.
 **/
 stepper.deconstruct = _ => {
-	// Make an entry for the unsorted.
-	if (!array_dump.unsorted)
-		array_dump.unsorted = {};
+	let v = array_tag.unsorted.length ? array_tag.unsorted :
+		array_tag.sorted.length ? array_tag.sorted : 0;
 
 	// See if there's still something left.
-	if (array_tag.length) {
-		// Pop a mail.
-		let i = array_tag.pop();
+	if (v) {
+		let x = array_tag.unsorted.length ?
+			array_tag.sorted.length : 0;
+		// Dequeue a mail (javascript calls it 'shift').
+		let i = v.shift();
 		// Get the post office it belongs to.
 		let from = address_selected[i].address.from;
 
+		for (let i in v)
+			stepper.ctrl(v[i], 1, Number(i) + x);
+
 		// See if we need to add an entry for the post office.
-		if (!array_dump.unsorted[from]) {
+		if (!array_tag.dump[from]) {
+			array_tag.dump[from] = [];
+			array_tag.buffer[from] = 0;
+
 			/* Make an entry for the post office order array.
 			   This will dictate which one will be prioritized first.
 			*/
-			if (!array_dump.order)
-				array_dump.order = [];
-
-			array_dump.order.push(from);
+			if (array_tag.order.indexOf(from) == -1)
+				array_tag.order.push(from);
 
 			// Make an entry for the containers array.
-			if (!array_dump.div)
-				array_dump.div = {};
-
 			let div = q("!div");
 			div.innerHTML = "<div>" +
 				from.split(" ").map(v => v[0]).join("") +
 				"</div>";
 
 			e.msg.appendChild(div);
-			array_dump.div[from] = div;
-
-			// Create the entry for the post office.
-			array_dump.unsorted[from] = [];
+			array_tag.div[from] = div;
 		}
 
-		// Push the mail to the designated post office array.
-		let n = array_dump.unsorted[from].push(i);
+		if (v == array_tag.unsorted)
+			array_tag.buffer[from]++;
 
-		stepper.ctrl(i, 0, 1);
+		// Push the mail to the designated post office array.
+		let n = array_tag.dump[from].push(i);
+
 		stepper.ctrl(i, 1, n - 1);
-		stepper.ctrl(i, 2, array_dump.div[from]);
-	} else return 1; // Finished
+		stepper.ctrl(i, 2, array_tag.div[from]);
+	} else {
+		let i = array_tag.dump[array_tag.order[0]] ? 0 : 1;
+		let k = array_tag.order[i];
+
+		// Make preparations for the 2nd part.
+		stepper.key = [
+			// Currently selected post office for sorting.
+			i,
+			// 'Element A' to be compared
+			1,
+			// 'Element B' to be compared.
+			array_tag.dump[k][0]
+		];
+
+		stepper.ctrl(array_tag.dump[k][0], 0, 2);
+
+		if (array_tag.dump[k].length > 1)
+			stepper.ctrl(array_tag.dump[k][1], 0, 3);
+
+		return 1; // Finished
+	}
 };
 
 /**
@@ -104,200 +125,161 @@ stepper.deconstruct = _ => {
  * post offices.
 **/
 stepper.arrange = _ => {
-	/* The key for the arranger. These are like a UID for each
-	   animation frames.
+	/* We'll sort with reverse bubble-like sort (It's reversed just
+	   for the animation).
 	*/
 	let k = stepper.key;
+	let c = stepper.ctrl;
+	let u = array_tag.buffer;
+	let o = array_tag.order;
+	let d = array_tag.dump;
 
-	// See the 'for loop' below for the key generator.
-	if (k) {
-		/* We'll sort with reverse bubble-like sort (It's reversed just
-		   for the animation).
-		*/
+	// Point to the post office's name.
+	let p = o[k[0]];
+	// The next element from the selected element.
+	let i = k[1];
+	// The selected post office array.
+	let v = d[p];
 
-		// The next element from the selected element.
-		let i = k[1];
-		// The selected post office array's name.
-		let loc = k[0];
-		// The selected post office array.
-		let v = array_dump.unsorted[loc];
+	// See if there's something to compare with.
+	if (i < v.length) {
+		let a = address_selected[k[2]]; // Selected value.
+		let b = address_selected[v[i]]; // Next value.
 
-		// See if we've completely ran through the entire array.
-		if (i == v.length) {
-			/* Put the value we've selected at the last element.
-			   This is assumed to be the highest value, since we've
-			   compared everything with it.
+		k[1]++;
+
+		if (stepper.sorttime) {
+			a = a.time;
+			b = b.time;
+		} else {
+			a = a.address.magnitude;
+			b = b.address.magnitude;
+		}
+
+		// See if the selected value has the higher value.
+		if (a > b) {
+			/* Move the next value down by 1 position (This is
+			   where we found the selected value, or the previously
+			   compared value).
+			*/
+			v[i-1] = v[i];
+
+			c(v[i-1], 0, i-1 >= u[p] ? 0 : 1);
+			c(v[i-1], 1, i-1);
+			c(k[2], 1, i);
+
+			if (i + 1 < v.length)
+				c(v[i+1], 0, 3);
+		} else {
+			/* A higher value was found. Select that instead.
+			   Put the previously selected value down as
+			   replacement.
 			*/
 			v[i-1] = k[2];
-			// Get rid of the key to start again.
-			stepper.key = null;
+			k[2] = v[i];
+
+			if (i < u[p]) {
+				c(v[i-1], 0, i-1 >= u[p] ? 0 : 1);
+				c(k[2], 0, 2);
+
+				if (i + 1 < v.length)
+					c(v[i+1], 0, 3);
+			} else
+				k[1] = -1;
+		}
+	}
+
+	if (k[1] == v.length || k[1] == -1) {
+		v[i] = k[2];
+
+		// Go back to start.
+		k[1] = 1;
+
+		// Decrement buffer.
+		u[p]--;
+
+		// Mark as sorted.
+		c(v[i-1], 0, 0);
+		c(v[i], 0, 0);
+
+		// See if there's still unsorted mails.
+		if (u[p] > 0) {
+			// Grab the first element again.
+			k[2] = d[p][0];
+
+			c(k[2], 0, 2);
+
+			if (v.length > 1)
+				c(d[p][1], 0, 3);
 		} else {
-			let a = address_selected[k[2]]; // Selected value.
-			let b = address_selected[v[i]]; // Next value.
+			// Go to the next post office.
+			p = o[k[0]++ + 1];
 
-			if (stepper.sorttime) {
-				a = a.time;
-				b = b.time;
+			// See if that was the last post office.
+			if (k[0] == o.length) {
+				// Setup for the next step.
+				stepper.key = d[o[0]] ? 0 : 1;
+
+				d[o[stepper.key]].map(v => c(v, 0, 2));
+
+				return 1;
 			} else {
-				a = a.address.magnitude;
-				b = b.address.magnitude;
+				// Create the next key.
+				k[2] = d[p][0];
+
+				c(k[2], 0, 2);
+
+				if (d[p].length > 1)
+					c(d[p][1], 0, 3);
 			}
-
-			// See if the selected value has the higher value.
-			if (a < b) {
-				/* Move the next value down by 1 position (This is
-				   where we found the selected value, or the previously
-				   compared value).
-				*/
-				v[i-1] = v[i];
-
-				stepper.ctrl(v[i], 0, 1);
-				stepper.ctrl(v[i], 1, i-1);
-				stepper.ctrl(k[2], 1, i);
-
-				if (v[i+1])
-					stepper.ctrl(v[i+1], 0, 3);
-			} else {
-				/* A higher value was found. Select that instead.
-				   Put the previously selected value down as
-				   replacement.
-				*/
-				v[i-1] = k[2];
-				k[2] = v[i];
-
-				stepper.ctrl(v[i-1], 0, 1);
-				stepper.ctrl(k[2], 0, 2);
-				stepper.ctrl(k[2], 1, i);
-
-				if (v[i+1])
-					stepper.ctrl(v[i+1], 0, 3);
-			}
-
-			// Keep counting until reaching the end.
-			k[1]++;
 		}
-
-		/* Key was removed. This is most likely we found the lowest
-		   value.
-		*/
-		if (!stepper.key) {
-			// Make an entry for the 'sorted' post offices.
-			if (!array_dump.sorted)
-				array_dump.sorted = [];
-
-			// Make an entry for the 'sorted' mails.
-			if (!array_dump.sorted[loc])
-				array_dump.sorted[loc] = [];
-
-			/* Grab the highest value (It's the last element since
-			   we deliberately moved it to the last element.) then
-			   push it to the sorted array, making a
-			   'highest to lowest' sorting.
-			*/
-			let n = v.pop();
-			array_dump.sorted[loc].unshift(n);
-
-			stepper.ctrl(n, 0, 0);
-		}
-
-		// Cut out from here since we don't want to spam keys.
-		return null;
 	}
-
-	// Grab 1 post office to sort.
-	for (let i in array_dump.unsorted) {
-		let v = array_dump.unsorted[i];
-
-		// Make sure it has mails in it.
-		if (v.length) {
-			// Write down the key for it.
-			stepper.key = [i, 1, v[0]];
-
-			stepper.ctrl(v[0], 0, 2);
-
-			if (v[1])
-				stepper.ctrl(v[1], 0, 3);
-
-			return null; // We only need 1.
-		} else
-			// Get rid of it. It's empty.
-			delete array_dump.unsorted[i];
-	}
-
-	return 1; // Finished
 };
 
 /**
  * Place everything back to the array.
 **/
 stepper.pour = _ => {
-	let k = stepper.key;
-	let o = array_dump.order;
-	let s = array_dump.sorted;
+	let o = array_tag.order;
+	let k = o[stepper.key];
+	let s = array_tag.dump;
+	let d = array_tag.div;
 
-	// See if there's no key yet.
-	if (!k) {
-		// Write key.
-		stepper.key = [0, -1];
+	// Extract array contents.
+	let v = s[k];
 
-		// Change label to 'Sorted'.
-		e.msg_main.innerHTML = "<div>Sorted</div>";
+	// Keep extracting until it's empty.
+	if (v.length) {
+		let i = v.shift();
+		let n = array_tag.sorted.push(i);
 
-		for (let i in s[o[0]])
-			stepper.ctrl(s[o[0]][i], 0, 2);
-	} else if (k[1] == 1) {
-		// Extract array contents.
-		let v = s[k[0]];
+		stepper.ctrl(i, 0, 0);
+		stepper.ctrl(i, 1, n-1);
+		stepper.ctrl(i, 2, e.msg_main);
 
-		// Keep extracting until it's empty.
-		if (v.length) {
-			let i = v.pop();
-			let n = array_tag.push(i);
+		for (let i in v)
+			stepper.ctrl(v[i], 1, Number(i));
+	}
 
-			stepper.ctrl(i, 0, 0);
-			stepper.ctrl(i, 1, n-1);
-			stepper.ctrl(i, 2, e.msg_main);
-		}
+	// See if it's empty.
+	if (!v.length) {
+		e.msg.removeChild(d[k]);
 
-		if (!v.length) {
-			k[1] = 0;
+		delete s[k];
+		delete d[k];
 
-			if (array_dump.div[k[0]]) {
-				e.msg.removeChild(array_dump.div[k[0]]);
+		stepper.key++;
 
-				delete array_dump.div[k[0]];
-			}
-		}
-	} else if (!k[1]) {
-		// Iterate through all remaining post offices.
-		if (o.length) {
-			// Grab the last element.
-			k[0] = o.pop();
-			k[1] = 1;
+		if (stepper.key == o.length) {
+			// Everything is done! Time to send the mails.
+			stepper.key = null;
 
-			for (let i in s[k[0]])
-				stepper.ctrl(s[k[0]][i], 0, 2);
+			// Dequeue the order once.
+			o.shift();
+
+			return 1;
 		} else
-			return 1; // Finished
-	} else if (o[k[0]] == office_selected) {
-		// Found the starting post office.
-		k[0] = o[k[0]];
-		k[1] = 1;
-	} else if (k[0] == o.length - 1) {
-		// No mails for the starting post office.
-		k[0] = k[1] = 0;
-
-		for (let i in s[o[0]])
-			stepper.ctrl(s[o[o.length-1]][i], 0, 0);
-	} else {
-		// Keep counting until everything is transfered.
-		k[0]++;
-
-		for (let i in s[o[k[0]]])
-			stepper.ctrl(s[o[k[0]]][i], 0, 2);
-
-		for (let i in s[o[k[0]-1]])
-			stepper.ctrl(s[o[k[0]-1]][i], 0, 0);
+			s[o[stepper.key]].map(v => stepper.ctrl(v, 0, 2));
 	}
 }
 
@@ -305,26 +287,37 @@ stepper.pour = _ => {
  * The mailman's journey in an iterator.
 **/
 stepper.mailman = _ => {
-	if (stepper.key) {
-		let v = address_selected[stepper.key];
+	// Peek at the top element first.
+	let s = array_tag.sorted;
+	let v = address_selected[s[0]];
+
+	if (!v || v.address.from != office_selected) {
+		// See if there's still mails left.
+		if (v) {
+			// Go to the next post office.
+			array[office_selected].pnt.removeAttribute("selected");
+			office_selected = v.address.from;
+			array[office_selected].pnt.setAttribute("selected", 1);
+		}
+
+		// No rest for the wicked.
+		mailman_move(array[office_selected].position);
+
+		return 1;
+	} if (stepper.key) {
 		stepper.key = null;
+
+		mailman_move(array[office_selected].position);
+	} else {
+		s.shift(); // Dequeue.
+
+		for (let i in s)
+			stepper.ctrl(s[i], 1, Number(i));
+
+		stepper.key = 1;
 
 		mailman_move(v.address.position);
 		e.msg_main.removeChild(v.div);
-
-		for (let i in array_tag)
-			stepper.ctrl(array_tag[i], 1, Number(i));
-	} else if (array_tag.length) {
-		stepper.key = array_tag.shift();
-
-		let v = address_selected[stepper.key].address;
-
-		mailman_move(array[v.from].position);
-	} else {
-		if (office_selected)
-			mailman_move(array[office_selected].position);
-
-		return 1;
 	}
 }
 
@@ -347,11 +340,8 @@ stepper.play = (callback, tick) => {
 	let i = stepper.playlist.length - 1;
 	stepper.step++;
 
-	if (stepper.playlist[i]()) {
-		stepper.key = null;
-
+	if (stepper.playlist[i]())
 		stepper.playlist.pop();
-	}
 
 	if (!stepper.playlist.length) {
 		stepper.playing = -1;
