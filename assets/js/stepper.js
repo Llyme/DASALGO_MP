@@ -53,31 +53,38 @@ stepper.ctrl = (i, flag, v) => {
  * This separates all by post offices.
 **/
 stepper.deconstruct = _ => {
-	let v = array_tag.unsorted.length ? array_tag.unsorted :
-		array_tag.sorted.length ? array_tag.sorted : 0;
+	let c = stepper.ctrl,
+		s = array_tag.sorted,
+		u = array_tag.unsorted,
+		d = array_tag.dump,
+		t = array_tag.buffer,
+		o = array_tag.order,
+		m = array_tag.div;
+
+	// Get the unsorted first, then the sorted.
+	let v = u.length ? u : s.length ? s : 0;
 
 	// See if there's still something left.
 	if (v) {
-		let x = array_tag.unsorted.length ?
-			array_tag.sorted.length : 0;
+		let x = u.length ? s.length : 0;
 		// Dequeue a mail (javascript calls it 'shift').
 		let i = v.shift();
 		// Get the post office it belongs to.
 		let from = address_selected[i].address.from;
 
 		for (let i in v)
-			stepper.ctrl(v[i], 1, Number(i) + x);
+			c(v[i], 1, Number(i) + x);
 
 		// See if we need to add an entry for the post office.
-		if (!array_tag.dump[from]) {
-			array_tag.dump[from] = [];
-			array_tag.buffer[from] = 0;
+		if (!d[from]) {
+			d[from] = [];
+			t[from] = 0;
 
 			/* Make an entry for the post office order array.
 			   This will dictate which one will be prioritized first.
 			*/
-			if (array_tag.order.indexOf(from) == -1)
-				array_tag.order.push(from);
+			if (o.indexOf(from) == -1)
+				o.push(from);
 
 			// Make an entry for the containers array.
 			let div = q("!div");
@@ -86,20 +93,20 @@ stepper.deconstruct = _ => {
 				"</div>";
 
 			e.msg.appendChild(div);
-			array_tag.div[from] = div;
+			m[from] = div;
 		}
 
-		if (v == array_tag.unsorted)
-			array_tag.buffer[from]++;
+		if (v == u)
+			t[from]++;
 
 		// Push the mail to the designated post office array.
-		let n = array_tag.dump[from].push(i);
+		let n = d[from].push(i);
 
-		stepper.ctrl(i, 1, n - 1);
-		stepper.ctrl(i, 2, array_tag.div[from]);
+		c(i, 1, n - 1);
+		c(i, 2, m[from]);
 	} else {
-		let i = array_tag.dump[array_tag.order[0]] ? 0 : 1;
-		let k = array_tag.order[i];
+		let i = d[o[0]] ? 0 : 1;
+		let k = o[i];
 
 		// Make preparations for the 2nd part.
 		stepper.key = [
@@ -108,13 +115,13 @@ stepper.deconstruct = _ => {
 			// 'Element A' to be compared
 			1,
 			// 'Element B' to be compared.
-			array_tag.dump[k][0]
+			d[k][0]
 		];
 
-		stepper.ctrl(array_tag.dump[k][0], 0, 2);
+		c(d[k][0], 0, 2);
 
-		if (array_tag.dump[k].length > 1)
-			stepper.ctrl(array_tag.dump[k][1], 0, 3);
+		if (d[k].length > 1)
+			c(d[k][1], 0, 3);
 
 		return 1; // Finished
 	}
@@ -128,11 +135,11 @@ stepper.arrange = _ => {
 	/* We'll sort with reverse bubble-like sort (It's reversed just
 	   for the animation).
 	*/
-	let k = stepper.key;
-	let c = stepper.ctrl;
-	let u = array_tag.buffer;
-	let o = array_tag.order;
-	let d = array_tag.dump;
+	let k = stepper.key,
+		c = stepper.ctrl,
+		t = array_tag.buffer,
+		o = array_tag.order,
+		d = array_tag.dump;
 
 	// Point to the post office's name.
 	let p = o[k[0]];
@@ -164,7 +171,7 @@ stepper.arrange = _ => {
 			*/
 			v[i-1] = v[i];
 
-			c(v[i-1], 0, i-1 >= u[p] ? 0 : 1);
+			c(v[i-1], 0, i-1 >= t[p] ? 0 : 1);
 			c(v[i-1], 1, i-1);
 			c(k[2], 1, i);
 
@@ -178,8 +185,8 @@ stepper.arrange = _ => {
 			v[i-1] = k[2];
 			k[2] = v[i];
 
-			if (i < u[p]) {
-				c(v[i-1], 0, i-1 >= u[p] ? 0 : 1);
+			if (i + 1 < t[p]) {
+				c(v[i-1], 0, i-1 >= t[p] ? 0 : 1);
 				c(k[2], 0, 2);
 
 				if (i + 1 < v.length)
@@ -190,20 +197,21 @@ stepper.arrange = _ => {
 	}
 
 	if (k[1] == v.length || k[1] == -1) {
-		v[i] = k[2];
+		if (v.length > 1)
+			v[i] = k[2];
 
 		// Go back to start.
 		k[1] = 1;
 
 		// Decrement buffer.
-		u[p]--;
+		t[p]--;
 
 		// Mark as sorted.
 		c(v[i-1], 0, 0);
 		c(v[i], 0, 0);
 
 		// See if there's still unsorted mails.
-		if (u[p] > 0) {
+		if (t[p] > 0) {
 			// Grab the first element again.
 			k[2] = d[p][0];
 
@@ -240,13 +248,13 @@ stepper.arrange = _ => {
  * Place everything back to the array.
 **/
 stepper.pour = _ => {
-	let o = array_tag.order;
-	let k = o[stepper.key];
-	let s = array_tag.dump;
-	let d = array_tag.div;
+	let o = array_tag.order,
+		k = o[stepper.key],
+		d = array_tag.dump,
+		m = array_tag.div;
 
 	// Extract array contents.
-	let v = s[k];
+	let v = d[k];
 
 	// Keep extracting until it's empty.
 	if (v.length) {
@@ -263,23 +271,23 @@ stepper.pour = _ => {
 
 	// See if it's empty.
 	if (!v.length) {
-		e.msg.removeChild(d[k]);
+		e.msg.removeChild(m[k]);
 
-		delete s[k];
 		delete d[k];
+		delete m[k];
 
 		stepper.key++;
 
 		if (stepper.key == o.length) {
 			// Everything is done! Time to send the mails.
-			stepper.key = null;
+			stepper.key = [[]];
 
 			// Dequeue the order once.
 			o.shift();
 
 			return 1;
 		} else
-			s[o[stepper.key]].map(v => stepper.ctrl(v, 0, 2));
+			d[o[stepper.key]].map(v => stepper.ctrl(v, 0, 2));
 	}
 }
 
@@ -288,6 +296,7 @@ stepper.pour = _ => {
 **/
 stepper.mailman = _ => {
 	// Peek at the top element first.
+	let k = stepper.key;
 	let s = array_tag.sorted;
 	let v = address_selected[s[0]];
 
@@ -298,14 +307,24 @@ stepper.mailman = _ => {
 			array[office_selected].pnt.removeAttribute("selected");
 			office_selected = v.address.from;
 			array[office_selected].pnt.setAttribute("selected", 1);
-		}
+		} else
+			// There's nothing to do. Just go back to where he were.
+			array_tag.order.push(office_selected);
 
 		// No rest for the wicked.
 		mailman_move(array[office_selected].position);
 
-		return 1;
-	} if (stepper.key) {
+		// Hide the points.
+		k[0].map(v => {
+			v.pnt.setAttribute("hidden", 1);
+			v.path.setAttribute("hidden", 1);
+		});
+
 		stepper.key = null;
+
+		return 1;
+	} if (k[1]) {
+		k[1] = null;
 
 		mailman_move(array[office_selected].position);
 	} else {
@@ -314,7 +333,10 @@ stepper.mailman = _ => {
 		for (let i in s)
 			stepper.ctrl(s[i], 1, Number(i));
 
-		stepper.key = 1;
+		k[1] = 1;
+
+		if (k[0].indexOf(v.address) == -1)
+			k[0].push(v.address);
 
 		mailman_move(v.address.position);
 		e.msg_main.removeChild(v.div);

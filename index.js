@@ -190,7 +190,12 @@ document.addEventListener("mousemove", div_speed_fn);
 
 // Play Button.
 img.ctrl[0].addEventListener("click", _ => {
-	stepper.play(i => i == 1 && ctrl_set(1, 0, 1, 1));
+	stepper.play( i => i == 1 && ctrl_set(
+		(array_tag.unsorted.length + array_tag.sorted.length) > 0,
+		0,
+		1,
+		1
+	));
 
 	ctrl_set(0, 1, 0, 0);
 });
@@ -306,6 +311,9 @@ function reset() {
 		sorted: [],
 		div: {}
 	};
+
+	// Clear our mail history.
+	address_selected = [];
 
 	// Disable play since there's no messages.
 	ctrl_set(0, 0, 1, 1);
