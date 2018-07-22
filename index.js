@@ -312,6 +312,10 @@ function reset() {
 		div: {}
 	};
 
+	// Add the selected office if 2nd time.
+	if (office_selected)
+		array_tag.order.push(office_selected);
+
 	// Clear our mail history.
 	address_selected = [];
 

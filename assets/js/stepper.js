@@ -185,7 +185,7 @@ stepper.arrange = _ => {
 			v[i-1] = k[2];
 			k[2] = v[i];
 
-			if (i + 1 < t[p]) {
+			if (i < t[p]) {
 				c(v[i-1], 0, i-1 >= t[p] ? 0 : 1);
 				c(k[2], 0, 2);
 
