@@ -46,6 +46,8 @@ const e = {
 	msg_write: q("#msg_write"),
 	// The input for the mail's recipient's name.
 	msg_write_input: q("#msg_write_input"),
+	// The input for the mail's date of submission.
+	msg_write_date: q("#msg_write_date"),
 	// The close button.
 	msg_write_close: q("#msg_write .btn")[0]
 };
@@ -228,6 +230,9 @@ function msg_write_show() {
 		Math.random()*name_struct.length
 	)];
 
+	// Set time to current.
+	e.msg_write_date.value = new Date().toJSON().slice(0, -8);
+
 	msg_write.removeAttribute("hidden");
 	msg_write_input.setAttribute("placeholder", name);
 	msg_write_input.focus(); // Focus immediately.
@@ -243,7 +248,7 @@ e.msg_write_input.addEventListener("keydown", event => {
 		let name = e.msg_write_input.value ? e.msg_write_input.value :
 			e.msg_write_input.getAttribute("placeholder");
 
-		let t = new Date();
+		let t = new Date(e.msg_write_date.value);
 		let div = q("!div");
 		div.innerHTML = name + "; " + t.toLocaleString() + "; " +
 			address.from.split(" ").map(v => v[0]).join("") + "; " +
