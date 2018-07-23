@@ -314,6 +314,27 @@ div#tooltip label {
 	box-shadow: 0 0 10px #000, 0 0 0 1px #000;
 }
 
+#msg_write_date {
+	display: block;
+	left: 0;
+	right: 0;
+	padding: 4px 8px;
+	margin: auto;
+	border: none;
+	outline: none;
+	background-color: #dfdfdf;
+	transition: all 0.2s;
+}
+
+#msg_write_date:hover {
+	box-shadow: 0 0 5px #000;
+}
+
+#msg_write_date:focus {
+	background-color: #fff;
+	box-shadow: 0 0 10px #000, 0 0 0 1px #000;
+}
+
 dim {
 	position: fixed;
 	top: 0;
